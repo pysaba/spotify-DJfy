@@ -1,6 +1,6 @@
 # DJfy: Harmonic Playlist Sorting for Spotify
 
-DJfy is a Python-based tool that reorders Spotify playlists according to harmonic compatibility using the Camelot wheel system. By analyzing the musical key of each track, DJfy rearranges your playlist to ensure a musically coherent listening experience, perfect for DJs and music enthusiasts alike.
+DJfy is a Python-based tool that reorders Spotify playlists according to harmonic compatibility using the Camelot wheel system. The user can choose which song the new playlist should start with. By analyzing the musical key of each track, DJfy rearranges your playlist to ensure a musically coherent listening experience, perfect for DJs and music enthusiasts alike.
 
 ## Getting Started
 
@@ -51,7 +51,6 @@ python djfy.py
 Follow the prompts to enter your Spotify playlist ID and let the script organize your playlist harmonically.
 
 ## Upcoming Features
-- Choosing Starting Track: Allow users to select the starting track for the playlist sorting.
 - Sorting by Tempo and Mood: Integrate audio feature analysis to sort tracks by tempo, mood, etc.
 - Dynamic Playlist Modes:
   - Energy Levels: Create playlists that start slow and gradually increase in tempo or vice versa.
