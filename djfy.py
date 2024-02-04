@@ -52,18 +52,39 @@ def fetch_playlist_tracks(playlist_id):
     features = sp.audio_features(track_ids)
     return features
 
-def find_next_track(current_code, available_tracks):
-    # Calculate possible next codes (adjacent and relative major/minor)
-    current_num, current_letter = int(current_code[:-1]), current_code[-1]
-    possible_next = [f"{(current_num % 12) + 1}A", f"{current_num}B" if current_letter == "A" else f"{current_num}A"]
-    possible_next.extend([f"{(current_num + 1) % 12}A", f"{(current_num - 1) % 12}A"])
 
-    # Find a track that matches one of the possible next codes
-    for code in possible_next:
-        for track in available_tracks:
-            if camelot_wheel.get((track['key'], track['mode'])) == code:
-                return track
-    return None
+def find_next_track(current_track, available_tracks):
+    current_code = camelot_wheel.get((current_track['key'], current_track['mode']))
+    closest_track = None
+    closest_distance = float('inf')
+
+    for track in available_tracks:
+        track_code = camelot_wheel.get((track['key'], track['mode']))
+
+        # Extract the numerical part of the Camelot codes
+        current_num = int(current_code[:-1])
+        track_num = int(track_code[:-1])
+
+        # Calculate the direct numerical distance
+        direct_distance = abs(track_num - current_num)
+
+        # Calculate the wrap-around distance (e.g., from "1" to "12" and vice versa)
+        wrap_around_distance = 12 - direct_distance
+
+        # Use the smaller of the two distances as the key distance
+        key_distance = min(direct_distance, wrap_around_distance)
+
+        # If tracks are in different modes but have the same Camelot number, prioritize them
+        if key_distance == 0 and track_code[-1] != current_code[-1]:
+            return track  # Immediate return, as this is the closest match possible
+
+        # If this track is closer than any previous one, update closest_track and closest_distance
+        if key_distance < closest_distance:
+            closest_distance = key_distance
+            closest_track = track
+
+    return closest_track
+
 
 def sort_tracks_camelot(tracks_features):
     sorted_tracks = []
@@ -75,7 +96,7 @@ def sort_tracks_camelot(tracks_features):
 
     while available_tracks:
         current_code = camelot_wheel.get((current_track['key'], current_track['mode']))
-        next_track = find_next_track(current_code, available_tracks)
+        next_track = find_next_track(current_track, available_tracks)
         if next_track:
             sorted_tracks.append(next_track)
             available_tracks.remove(next_track)
@@ -96,7 +117,9 @@ tracks_features = fetch_playlist_tracks(playlist_id)
 sorted_tracks = sort_tracks_camelot(tracks_features)
 user_id = sp.current_user()['id']  # Fetch the current user's Spotify ID
 create_playlist_and_add_tracks(user_id,sorted_tracks)
-#for track in sorted_tracks:
-#    print(camelot_wheel.get((track['key'], track['mode'])))
+for track in sorted_tracks:
+    print(camelot_wheel.get((track['key'], track['mode'])))
 
 #TODO: EDGE CASES, MORE CAMELOT MOVEMENT RESEARCH
+#TODO: Starting track
+#TODO: More sorting according to tempe, mood etc., maybe add different modes (starting fast to ending slow, starting slow to going fast etc.)
