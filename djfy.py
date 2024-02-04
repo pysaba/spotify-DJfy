@@ -14,35 +14,36 @@ client_secret = os.getenv('SPOTIFY_CLIENT_SECRET')
 # Replace 'your_client_id' and 'your_client_secret' with your app's details
 sp = spotipy.Spotify(auth_manager=SpotifyOAuth(client_id=client_id,
                                                client_secret=client_secret,
-                                               redirect_uri='http://localhost:8888',   # Ensure this matches the URI in your app settings
+                                               redirect_uri='http://localhost:8888',
+                                               # Ensure this matches the URI in your app settings
                                                scope='playlist-modify-public user-library-read'))
 
 camelot_wheel = {
     # (key, mode): Camelot Code
-    (0, 1): '8B', # C Major
-    (0, 0): '5A', # A minor
-    (1, 1): '3B', # C♯ Major / D♭ Major
-    (1, 0): '12A', # A♯ minor / B♭ minor
-    (2, 1): '10B', # D Major
-    (2, 0): '7A', # B minor
-    (3, 1): '5B', # D♯ Major / E♭ Major
-    (3, 0): '2A', # C minor
-    (4, 1): '12B', # E Major
-    (4, 0): '9A', # C♯ minor / D♭ minor
-    (5, 1): '7B', # F Major
-    (5, 0): '4A', # D minor
-    (6, 1): '2B', # F♯ Major / G♭ Major
-    (6, 0): '11A', # E minor
-    (7, 1): '9B', # G Major
-    (7, 0): '6A', # E♭ minor / D♯ minor
-    (8, 1): '4B', # G♯ Major / A♭ Major
-    (8, 0): '1A', # F minor
-    (9, 1): '11B', # A Major
-    (9, 0): '8A', # F♯ minor / G♭ minor
-    (10, 1): '6B', # A♯ Major / B♭ Major
-    (10, 0): '3A', # G minor
-    (11, 1): '1B', # B Major
-    (11, 0): '10A', # G♯ minor / A♭ minor
+    (0, 1): '8B',  # C Major
+    (0, 0): '5A',  # A minor
+    (1, 1): '3B',  # C♯ Major / D♭ Major
+    (1, 0): '12A',  # A♯ minor / B♭ minor
+    (2, 1): '10B',  # D Major
+    (2, 0): '7A',  # B minor
+    (3, 1): '5B',  # D♯ Major / E♭ Major
+    (3, 0): '2A',  # C minor
+    (4, 1): '12B',  # E Major
+    (4, 0): '9A',  # C♯ minor / D♭ minor
+    (5, 1): '7B',  # F Major
+    (5, 0): '4A',  # D minor
+    (6, 1): '2B',  # F♯ Major / G♭ Major
+    (6, 0): '11A',  # E minor
+    (7, 1): '9B',  # G Major
+    (7, 0): '6A',  # E♭ minor / D♯ minor
+    (8, 1): '4B',  # G♯ Major / A♭ Major
+    (8, 0): '1A',  # F minor
+    (9, 1): '11B',  # A Major
+    (9, 0): '8A',  # F♯ minor / G♭ minor
+    (10, 1): '6B',  # A♯ Major / B♭ Major
+    (10, 0): '3A',  # G minor
+    (11, 1): '1B',  # B Major
+    (11, 0): '10A',  # G♯ minor / A♭ minor
 }
 
 
@@ -52,6 +53,16 @@ def fetch_playlist_tracks(playlist_id):
     features = sp.audio_features(track_ids)
     return features
 
+def fetch_tracks_metadata(playlist_id):
+    tracks_metadata = []
+    tracks = sp.playlist_tracks(playlist_id)['items']
+    track_ids = [track['track']['id'] for track in tracks]
+    # Spotify allows fetching metadata for up to 50 tracks at once
+    for i in range(0, len(track_ids), 50):
+        batch = track_ids[i:i+50]
+        tracks_data = sp.tracks(batch)
+        tracks_metadata.extend(tracks_data['tracks'])
+    return tracks_metadata
 
 def find_next_track(current_track, available_tracks):
     current_code = camelot_wheel.get((current_track['key'], current_track['mode']))
@@ -86,14 +97,11 @@ def find_next_track(current_track, available_tracks):
     return closest_track
 
 
-def sort_tracks_camelot(tracks_features):
-    sorted_tracks = []
-    available_tracks = tracks_features[:] # Create a copy to modify
-
-    # Start with the first track (could enhance to start with a specific key)
-    current_track = available_tracks.pop(0)
-    sorted_tracks.append(current_track)
-
+def sort_tracks_camelot(tracks_features, starting_track_index):
+    sorted_tracks = [tracks_features[starting_track_index]]  # Start with the selected track
+    available_tracks = [t for t in tracks_features if
+                        t != tracks_features[starting_track_index]]  # Remove the starting track from available tracks
+    current_track = tracks_features[starting_track_index]
     while available_tracks:
         current_code = camelot_wheel.get((current_track['key'], current_track['mode']))
         next_track = find_next_track(current_track, available_tracks)
@@ -102,7 +110,7 @@ def sort_tracks_camelot(tracks_features):
             available_tracks.remove(next_track)
             current_track = next_track
         else:
-            break # No more harmonically matching tracks found
+            break  # No more harmonically matching tracks found
 
     return sorted_tracks
 
@@ -112,15 +120,44 @@ def create_playlist_and_add_tracks(user_id, sorted_tracks):
     track_uris = [track['uri'] for track in sorted_tracks]
     sp.playlist_add_items(new_playlist['id'], track_uris)
 
+
+def get_user_input_for_starting_track_index(tracks_metadata):
+    starting_track_title = input("Enter the starting track title: ")
+    # Corrected to use list comprehension for immediate evaluation
+    matching_tracks = [track for track in tracks_metadata if starting_track_title.lower() in track['name'].lower()]
+
+    if not matching_tracks:
+        print("Track title not found in the playlist. Defaulting to first track in playlist.")
+        return 0  # Handle this case appropriately in your code
+
+    if len(matching_tracks) > 1:
+        print("Multiple tracks found with that title:")
+        for i, track in enumerate(matching_tracks):
+            artist_name = track['artists'][0]['name'] if track['artists'] else "Unknown Artist"
+            print(f"{i+1}: {track['name']} by {artist_name}")
+        chosen_index = int(input("Enter the number of the correct track: ")) - 1
+        chosen_track = matching_tracks[chosen_index]
+    else:
+        chosen_track = matching_tracks[0]
+
+    # Find the index of the chosen track in the original tracks_metadata list
+    chosen_track_index = tracks_metadata.index(chosen_track)
+    return chosen_track_index
+
+
+
 playlist_id = input("Enter the Spotify Playlist ID: ")
+track_metadata = fetch_tracks_metadata(playlist_id)
+#print(list(track for track in track_metadata))
 tracks_features = fetch_playlist_tracks(playlist_id)
-sorted_tracks = sort_tracks_camelot(tracks_features)
+starting_track_index = get_user_input_for_starting_track_index(track_metadata)
+sorted_tracks = sort_tracks_camelot(tracks_features, starting_track_index)
 user_id = sp.current_user()['id']  # Fetch the current user's Spotify ID
-create_playlist_and_add_tracks(user_id,sorted_tracks)
+create_playlist_and_add_tracks(user_id, sorted_tracks)
 for track in sorted_tracks:
     print(camelot_wheel.get((track['key'], track['mode'])))
 
-#TODO: EDGE CASES, MORE CAMELOT MOVEMENT RESEARCH
-#TODO: Starting track
-#TODO: More sorting according to tempe, mood etc., maybe add different modes (starting fast to ending slow, starting slow to going fast etc.)
-#TODO: Website
+# TODO: EDGE CASES, MORE CAMELOT MOVEMENT RESEARCH
+# TODO: Starting track
+# TODO: More sorting according to tempe, mood etc., maybe add different modes (starting fast to ending slow, starting slow to going fast etc.)
+# TODO: Website
