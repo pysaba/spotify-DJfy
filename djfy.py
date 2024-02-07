@@ -2,6 +2,9 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 from dotenv import load_dotenv
 import os
+import tkinter as tk
+from tkinter import messagebox
+from tkinter.simpledialog import askstring
 
 # Load environment variables from .env file
 load_dotenv()
@@ -145,19 +148,78 @@ def get_user_input_for_starting_track_index(tracks_metadata):
     return chosen_track_index
 
 
+def get_starting_track_index(tracks_metadata,starting_track_title):
+    # Corrected to use list comprehension for immediate evaluation
+    matching_tracks = [track for track in tracks_metadata if starting_track_title.lower() in track['name'].lower()]
 
-playlist_id = input("Enter the Spotify Playlist ID: ")
-track_metadata = fetch_tracks_metadata(playlist_id)
-#print(list(track for track in track_metadata))
-tracks_features = fetch_playlist_tracks(playlist_id)
-starting_track_index = get_user_input_for_starting_track_index(track_metadata)
-sorted_tracks = sort_tracks_camelot(tracks_features, starting_track_index)
-user_id = sp.current_user()['id']  # Fetch the current user's Spotify ID
-create_playlist_and_add_tracks(user_id, sorted_tracks)
-for track in sorted_tracks:
-    print(camelot_wheel.get((track['key'], track['mode'])))
+    if not matching_tracks:
+        print("Track title not found in the playlist. Defaulting to first track in playlist.")
+        return 0  # Handle this case appropriately in your code
 
-# TODO: EDGE CASES, MORE CAMELOT MOVEMENT RESEARCH
-# TODO: Starting track
+    if len(matching_tracks) > 1:
+        print("Multiple tracks found with that title:")
+        for i, track in enumerate(matching_tracks):
+            artist_name = track['artists'][0]['name'] if track['artists'] else "Unknown Artist"
+            print(f"{i+1}: {track['name']} by {artist_name}")
+        chosen_index = int(input("Enter the number of the correct track: ")) - 1
+        chosen_track = matching_tracks[chosen_index]
+    else:
+        chosen_track = matching_tracks[0]
+
+    # Find the index of the chosen track in the original tracks_metadata list
+    chosen_track_index = tracks_metadata.index(chosen_track)
+    return chosen_track_index
+
+def sort_and_create_playlist():
+    playlist_id = playlist_id_entry.get()
+    starting_track_title = starting_track_entry.get()
+    if not playlist_id:
+        messagebox.showerror("Error", "Please enter a Spotify playlist ID.")
+        return
+    try:
+        track_metadata = fetch_tracks_metadata(playlist_id)
+        tracks_features = fetch_playlist_tracks(playlist_id)
+        starting_track_index = get_starting_track_index(track_metadata,starting_track_title)
+        sorted_tracks = sort_tracks_camelot(tracks_features, starting_track_index)
+        user_id = sp.current_user()['id']  # Fetch the current user's Spotify ID
+        create_playlist_and_add_tracks(user_id, sorted_tracks)
+        for track in sorted_tracks:
+           print(camelot_wheel.get((track['key'], track['mode'])))
+        print(f"Sorting playlist {playlist_id} starting from track '{starting_track_title}'...")
+        messagebox.showinfo("Success", "Playlist sorted successfully!")
+    except Exception as e:
+        messagebox.showerror("Error", str(e))
+
+# Create the main window
+root = tk.Tk()
+root.title("DJfy: Harmonic Playlist Sorting")
+
+# Create and pack the widgets
+tk.Label(root, text="Spotify Playlist ID:").pack()
+playlist_id_entry = tk.Entry(root)
+playlist_id_entry.pack()
+
+tk.Label(root, text="Starting Track (optional):").pack()
+starting_track_entry = tk.Entry(root)
+starting_track_entry.pack()
+
+sort_button = tk.Button(root, text="Sort Playlist", command=sort_and_create_playlist)
+sort_button.pack()
+
+# Start the GUI event loop
+root.mainloop()
+
+
+#playlist_id = input("Enter the Spotify Playlist ID: ")
+#track_metadata = fetch_tracks_metadata(playlist_id)
+#tracks_features = fetch_playlist_tracks(playlist_id)
+#starting_track_index = get_user_input_for_starting_track_index(track_metadata)
+#sorted_tracks = sort_tracks_camelot(tracks_features, starting_track_index)
+#user_id = sp.current_user()['id']  # Fetch the current user's Spotify ID
+#create_playlist_and_add_tracks(user_id, sorted_tracks)
+#for track in sorted_tracks:
+#    print(camelot_wheel.get((track['key'], track['mode'])))
+
+# TODO: MORE CAMELOT MOVEMENT RESEARCH
 # TODO: More sorting according to tempe, mood etc., maybe add different modes (starting fast to ending slow, starting slow to going fast etc.)
 # TODO: Website
